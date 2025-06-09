@@ -158,6 +158,12 @@ if st.button("🚀 Genereer planning"):
         save_leerkrachten(st.session_state.leerkrachten)
         st.sidebar.success(f"Leerkracht {selected} verwijderd.")
         st.rerun()
+
+    if st.sidebar.button("🗑️ Verwijder leerkracht"):
+        st.session_state.leerkrachten = [l for l in st.session_state.leerkrachten if l.naam != selected]
+        save_leerkrachten(st.session_state.leerkrachten)
+        st.sidebar.success(f"Leerkracht {selected} verwijderd.")
+        st.rerun()
                     aantal = 1
                 alle_toezichten.extend([(dag, tijd, locatie, DUUR_PER_TIJD[tijd])] * aantal)
 
