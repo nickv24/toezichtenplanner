@@ -108,7 +108,10 @@ if st.sidebar.button("➕ Opslaan"):
     st.sidebar.success(f"{naam} toegevoegd.")
     st.rerun()
 else:
-    lk = next(l for l in st.session_state.leerkrachten if l.naam == selected)
+    lk = next((l for l in st.session_state.leerkrachten if l.naam == selected), None)
+    if lk is None:
+        st.sidebar.error("❌ Leerkracht niet gevonden.")
+        st.stop()
     naam = st.sidebar.text_input("Naam", value=lk.naam)
     regime = st.sidebar.selectbox("Regime", ["voltijds", "4/5", "halftijds"], index=["voltijds", "4/5", "halftijds"].index(lk.regime))
     functie = st.sidebar.selectbox("Functie", ["lager", "kleuter", "alles"], index=["lager", "kleuter", "alles"].index(lk.functie))
