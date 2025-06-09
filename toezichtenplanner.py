@@ -33,8 +33,7 @@ DUUR_PER_TIJD = {
 AANTAL_PER_LOCATIE = {
     ("11:25", "refter"): 2,
     ("11:55", "refter"): 2,
-    ("12:25", "grote speelplaats"): 2,
-    ("woensdag", "11:35"): 2
+    ("12:25", "grote speelplaats"): 2
 }
 
 LEERKRACHTEN_FILE = "leerkrachten.json"
@@ -131,9 +130,12 @@ if st.button("\ud83d\ude80 Genereer planning"):
             duur = DUUR_PER_TIJD[tijd]
             locaties = LOCATIES_PER_TIJD.get(tijd, [])
             for locatie in locaties:
-                aantal = AANTAL_PER_LOCATIE.get((tijd, locatie), 1)
-                if dag == "woensdag" and tijd == "11:35":
-                    aantal = AANTAL_PER_LOCATIE.get((dag, tijd), 1)
+                if (tijd, locatie) in AANTAL_PER_LOCATIE:
+                    aantal = AANTAL_PER_LOCATIE[(tijd, locatie)]
+                elif dag == "woensdag" and tijd == "11:35":
+                    aantal = 2
+                else:
+                    aantal = 1
                 toezicht_naam = locatie
                 kandidaten = [lk for lk in st.session_state.leerkrachten if lk.is_beschikbaar(dag, tijd) and lk.heeft_nog_capaciteit(duur)]
                 kandidaten.sort(key=lambda x: -x.voorkeur_score(locatie))
