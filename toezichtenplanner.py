@@ -1,9 +1,10 @@
-# toezichtplanner_webapp.py (met vaste duur, vaste aantallen en warme maaltijdtoezicht)
+# toezichtplanner_webapp.py (met automatische puntenverdeling en rooster)
 import streamlit as st
 from collections import defaultdict
 import random
 import json
 import os
+import pandas as pd
 
 st.set_page_config(page_title="Toezichtplanner", layout="wide")
 
@@ -38,19 +39,13 @@ AANTAL_PER_LOCATIE = {
 
 LEERKRACHTEN_FILE = "leerkrachten.json"
 
-REGIME_MAX_PUNTEN = {
-    "voltijds": 100,
-    "4/5": 80,
-    "halftijds": 60
-}
-
 class Leerkracht:
     def __init__(self, naam, regime, niet_beschikbaarheden, functie, warme_maaltijd=False):
         self.naam = naam
         self.regime = regime
         self.functie = functie
         self.warme_maaltijd = warme_maaltijd
-        self.max_punten = REGIME_MAX_PUNTEN[regime]
+        self.max_punten = 0  # wordt later berekend
         self.niet_beschikbaarheden = niet_beschikbaarheden
         self.toegewezen_toezichten = []
         self.totaal_punten = 0
@@ -86,7 +81,7 @@ def save_leerkrachten(leerkrachten):
         json.dump([lk.__dict__ for lk in leerkrachten], f, indent=2)
 
 # --- UI ---
-st.title("📄 Toezichtplanner Webapp (met vaste waardes en maaltijdtoezicht)")
+st.title("📄 Toezichtplanner Webapp (automatische verdeling + rooster)")
 
 st.sidebar.header("🏫 Leerkrachtenbeheer")
 if "leerkrachten" not in st.session_state:
@@ -97,7 +92,7 @@ selected = st.sidebar.selectbox("Kies of voeg leerkracht toe:", ["Nieuwe leerkra
 
 if selected == "Nieuwe leerkracht":
     naam = st.sidebar.text_input("Naam", key="new")
-    regime = st.sidebar.selectbox("Regime", list(REGIME_MAX_PUNTEN.keys()), index=0)
+    regime = st.sidebar.selectbox("Regime", ["voltijds", "4/5", "halftijds"], index=0)
     functie = st.sidebar.selectbox("Functie", ["lager", "kleuter", "alles"], index=2)
     warme_maaltijd = st.sidebar.checkbox("Toegewezen voor warme maaltijden?", value=False)
     niet_beschikbaarheden = {}
@@ -107,27 +102,29 @@ if selected == "Nieuwe leerkracht":
         if slots:
             niet_beschikbaarheden[dag] = slots
     if st.sidebar.button("➕ Opslaan"):
+    st.session_state.nieuwe_leerkracht_toegevoegd = naam
         st.session_state.leerkrachten.append(Leerkracht(naam, regime, niet_beschikbaarheden, functie, warme_maaltijd))
         save_leerkrachten(st.session_state.leerkrachten)
         st.sidebar.success(f"{naam} toegevoegd.")
-        st.rerun()
+        st.experimental_rerun()
 else:
     st.sidebar.write(f"**{selected}** is al opgeslagen. Bewerk in JSON indien nodig.")
+
+# --- Feedback nieuwe leerkracht ---
+if "nieuwe_leerkracht_toegevoegd" in st.session_state:
+    st.success(f"✅ Leerkracht '{st.session_state.nieuwe_leerkracht_toegevoegd}' succesvol toegevoegd!")
+    del st.session_state.nieuwe_leerkracht_toegevoegd
 
 # --- Planner ---
 if st.button("🚀 Genereer planning"):
     toezichtschema = defaultdict(list)
     conflicten = []
 
-    for lk in st.session_state.leerkrachten:
-        lk.toegewezen_toezichten.clear()
-        lk.totaal_punten = 0
-
+    alle_toezichten = []
     for dag in DAGEN:
         for tijd in TIJDSLOTS:
             if dag == "woensdag" and tijd in ["11:25", "11:55", "12:25", "14:45"]:
-                continue  # geen toezichten meer na 11:35
-            duur = DUUR_PER_TIJD[tijd]
+                continue
             locaties = LOCATIES_PER_TIJD.get(tijd, [])
             for locatie in locaties:
                 if (tijd, locatie) in AANTAL_PER_LOCATIE:
@@ -136,28 +133,45 @@ if st.button("🚀 Genereer planning"):
                     aantal = 2
                 else:
                     aantal = 1
-                toezicht_naam = locatie
-                kandidaten = [lk for lk in st.session_state.leerkrachten if lk.is_beschikbaar(dag, tijd) and lk.heeft_nog_capaciteit(duur)]
-                kandidaten.sort(key=lambda x: -x.voorkeur_score(locatie))
-                toegewezen = 0
-                for lk in kandidaten:
-                    if toegewezen >= aantal:
-                        break
-                    lk.wijs_toezicht_toe(dag, tijd, locatie, duur)
-                    toezichtschema[(dag, tijd, locatie)].append(lk.naam)
-                    toegewezen += 1
-                if toegewezen < aantal:
-                    conflicten.append(f"{dag} {tijd} ({locatie}): tekort ({toegewezen}/{aantal})")
+                alle_toezichten.extend([(dag, tijd, locatie, DUUR_PER_TIJD[tijd])] * aantal)
 
-    # Warme maaltijden toewijzen
+    totaal_waarde = sum(tz[3] for tz in alle_toezichten) + 30 * sum(1 for lk in st.session_state.leerkrachten if lk.warme_maaltijd)
+    kleuter_lk = [lk for lk in st.session_state.leerkrachten if lk.functie in ["kleuter", "alles"]]
+    lager_lk = [lk for lk in st.session_state.leerkrachten if lk.functie == "lager"]
+    totaal_lk = len(kleuter_lk) + len(lager_lk)
+
+    for lk in st.session_state.leerkrachten:
+        if lk.functie in ["kleuter", "alles"]:
+            lk.max_punten = round(totaal_waarde * 0.57 / len(kleuter_lk))
+        else:
+            lk.max_punten = round(totaal_waarde * 0.43 / len(lager_lk))
+        lk.toegewezen_toezichten.clear()
+        lk.totaal_punten = 0
+
+    for dag, tijd, locatie, duur in alle_toezichten:
+        kandidaten = [lk for lk in st.session_state.leerkrachten if lk.is_beschikbaar(dag, tijd) and lk.heeft_nog_capaciteit(duur)]
+        kandidaten.sort(key=lambda x: -x.voorkeur_score(locatie))
+        if kandidaten:
+            gekozen = kandidaten[0]
+            gekozen.wijs_toezicht_toe(dag, tijd, locatie, duur)
+            toezichtschema[(dag, tijd, locatie)].append(gekozen.naam)
+        else:
+            conflicten.append(f"{dag} {tijd} ({locatie}): geen geschikte leerkracht")
+
     for lk in st.session_state.leerkrachten:
         if lk.warme_maaltijd:
             lk.wijs_toezicht_toe("dagelijks", "maaltijd", "warme maaltijden", 30)
             toezichtschema[("dagelijks", "maaltijd", "warme maaltijden")].append(lk.naam)
 
-    st.subheader("📋 Toezichtschema")
-    for (dag, tijd, locatie), namen in sorted(toezichtschema.items()):
-        st.markdown(f"**{dag} {tijd} - {locatie}**: {', '.join(namen)}")
+    st.subheader("📋 Rooster")
+    rooster = pd.DataFrame(columns=["Tijd"] + DAGEN)
+    for tijd in TIJDSLOTS:
+        rij = {"Tijd": tijd}
+        for dag in DAGEN:
+            items = [f"{loc}: {', '.join(toezichtschema[(dag, tijd, loc)])}" for loc in LOCATIES_PER_TIJD.get(tijd, []) if (dag, tijd, loc) in toezichtschema]
+            rij[dag] = "\n".join(items)
+        rooster = pd.concat([rooster, pd.DataFrame([rij])], ignore_index=True)
+    st.dataframe(rooster)
 
     if conflicten:
         st.error("⚠️ Onvoldoende leerkrachten voor:")
