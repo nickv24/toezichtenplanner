@@ -101,14 +101,12 @@ if selected == "Nieuwe leerkracht":
         slots = st.sidebar.multiselect(f"{dag}", TIJDSLOTS, key=dag)
         if slots:
             niet_beschikbaarheden[dag] = slots
-    if st.sidebar.button("➕ Opslaan"):
+if st.sidebar.button("➕ Opslaan"):
     st.session_state.nieuwe_leerkracht_toegevoegd = naam
     st.session_state.leerkrachten.append(Leerkracht(naam, regime, niet_beschikbaarheden, functie, warme_maaltijd))
     save_leerkrachten(st.session_state.leerkrachten)
     st.sidebar.success(f"{naam} toegevoegd.")
     st.rerun()
-else:
-    st.sidebar.write(f"**{selected}** is al opgeslagen. Bewerk in JSON indien nodig.")
 
 # --- Feedback nieuwe leerkracht ---
 if "nieuwe_leerkracht_toegevoegd" in st.session_state:
@@ -132,13 +130,40 @@ if st.button("🚀 Genereer planning"):
                 elif dag == "woensdag" and tijd == "11:35":
                     aantal = 2
                 else:
+    lk = next(l for l in st.session_state.leerkrachten if l.naam == selected)
+    naam = st.sidebar.text_input("Naam", value=lk.naam)
+    regime = st.sidebar.selectbox("Regime", ["voltijds", "4/5", "halftijds"], index=["voltijds", "4/5", "halftijds"].index(lk.regime))
+    functie = st.sidebar.selectbox("Functie", ["lager", "kleuter", "alles"], index=["lager", "kleuter", "alles"].index(lk.functie))
+    warme_maaltijd = st.sidebar.checkbox("Toegewezen voor warme maaltijden?", value=lk.warme_maaltijd)
+    niet_beschikbaarheden = {}
+    st.sidebar.markdown("Pas momenten aan waarop deze leerkracht **niet beschikbaar** is:")
+    for dag in DAGEN:
+        huidige = lk.niet_beschikbaarheden.get(dag, [])
+        slots = st.sidebar.multiselect(f"{dag}", TIJDSLOTS, default=huidige, key=f"edit_{dag}")
+        if slots:
+            niet_beschikbaarheden[dag] = slots
+
+    if st.sidebar.button("💾 Wijzigingen opslaan"):
+        lk.naam = naam
+        lk.regime = regime
+        lk.functie = functie
+        lk.warme_maaltijd = warme_maaltijd
+        lk.niet_beschikbaarheden = niet_beschikbaarheden
+        save_leerkrachten(st.session_state.leerkrachten)
+        st.sidebar.success(f"Wijzigingen aan {naam} opgeslagen.")
+        st.rerun()
+
+    if st.sidebar.button("🗑️ Verwijder leerkracht"):
+        st.session_state.leerkrachten = [l for l in st.session_state.leerkrachten if l.naam != selected]
+        save_leerkrachten(st.session_state.leerkrachten)
+        st.sidebar.success(f"Leerkracht {selected} verwijderd.")
+        st.rerun()
                     aantal = 1
                 alle_toezichten.extend([(dag, tijd, locatie, DUUR_PER_TIJD[tijd])] * aantal)
 
     totaal_waarde = sum(tz[3] for tz in alle_toezichten) + 30 * sum(1 for lk in st.session_state.leerkrachten if lk.warme_maaltijd)
     kleuter_lk = [lk for lk in st.session_state.leerkrachten if lk.functie in ["kleuter", "alles"]]
     lager_lk = [lk for lk in st.session_state.leerkrachten if lk.functie == "lager"]
-    totaal_lk = len(kleuter_lk) + len(lager_lk)
 
     for lk in st.session_state.leerkrachten:
         if lk.functie in ["kleuter", "alles"]:
@@ -169,9 +194,13 @@ if st.button("🚀 Genereer planning"):
         rij = {"Tijd": tijd}
         for dag in DAGEN:
             items = [f"{loc}: {', '.join(toezichtschema[(dag, tijd, loc)])}" for loc in LOCATIES_PER_TIJD.get(tijd, []) if (dag, tijd, loc) in toezichtschema]
-            rij[dag] = "\n".join(items)
+            rij[dag] = "
+".join(items)
         rooster = pd.concat([rooster, pd.DataFrame([rij])], ignore_index=True)
     st.dataframe(rooster)
+
+    csv = rooster.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download rooster als CSV", data=csv, file_name="toezicht_rooster.csv", mime="text/csv")
 
     if conflicten:
         st.error("⚠️ Onvoldoende leerkrachten voor:")
