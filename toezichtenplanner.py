@@ -103,10 +103,10 @@ if selected == "Nieuwe leerkracht":
             niet_beschikbaarheden[dag] = slots
     if st.sidebar.button("➕ Opslaan"):
     st.session_state.nieuwe_leerkracht_toegevoegd = naam
-        st.session_state.leerkrachten.append(Leerkracht(naam, regime, niet_beschikbaarheden, functie, warme_maaltijd))
-        save_leerkrachten(st.session_state.leerkrachten)
-        st.sidebar.success(f"{naam} toegevoegd.")
-        st.experimental_rerun()
+    st.session_state.leerkrachten.append(Leerkracht(naam, regime, niet_beschikbaarheden, functie, warme_maaltijd))
+    save_leerkrachten(st.session_state.leerkrachten)
+    st.sidebar.success(f"{naam} toegevoegd.")
+    st.rerun()
 else:
     st.sidebar.write(f"**{selected}** is al opgeslagen. Bewerk in JSON indien nodig.")
 
