@@ -156,7 +156,7 @@ if st.button("🚀 Genereer planning"):
             for locatie in locaties:
                 if (tijd, locatie) in AANTAL_PER_LOCATIE:
                     aantal = AANTAL_PER_LOCATIE[(tijd, locatie)]
-                                elif dag == "woensdag" and tijd == "11:35":
+                elif dag == "woensdag" and tijd == "11:35":
                     aantal = 2
                 else:
                     aantal = 1
