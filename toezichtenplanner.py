@@ -86,9 +86,9 @@ def save_leerkrachten(leerkrachten):
         json.dump([lk.__dict__ for lk in leerkrachten], f, indent=2)
 
 # --- UI ---
-st.title("\ud83d\udcc4 Toezichtplanner Webapp (met vaste waardes en maaltijdtoezicht)")
+st.title("📄 Toezichtplanner Webapp (met vaste waardes en maaltijdtoezicht)")
 
-st.sidebar.header("\ud83c\udfe2 Leerkrachtenbeheer")
+st.sidebar.header("🏫 Leerkrachtenbeheer")
 if "leerkrachten" not in st.session_state:
     st.session_state.leerkrachten = load_leerkrachten()
 
@@ -115,7 +115,7 @@ else:
     st.sidebar.write(f"**{selected}** is al opgeslagen. Bewerk in JSON indien nodig.")
 
 # --- Planner ---
-if st.button("\ud83d\ude80 Genereer planning"):
+if st.button("🚀 Genereer planning"):
     toezichtschema = defaultdict(list)
     conflicten = []
 
@@ -155,7 +155,7 @@ if st.button("\ud83d\ude80 Genereer planning"):
             lk.wijs_toezicht_toe("dagelijks", "maaltijd", "warme maaltijden", 30)
             toezichtschema[("dagelijks", "maaltijd", "warme maaltijden")].append(lk.naam)
 
-    st.subheader("\ud83d\udccb Toezichtschema")
+    st.subheader("📋 Toezichtschema")
     for (dag, tijd, locatie), namen in sorted(toezichtschema.items()):
         st.markdown(f"**{dag} {tijd} - {locatie}**: {', '.join(namen)}")
 
@@ -164,7 +164,7 @@ if st.button("\ud83d\ude80 Genereer planning"):
         for c in conflicten:
             st.markdown(f"- {c}")
 
-    st.subheader("\ud83d\udc69\u200d\ud83c\udfeb Leerkrachtensamenvatting")
+    st.subheader("👩‍🏫 Leerkrachtensamenvatting")
     for lk in st.session_state.leerkrachten:
         st.markdown(f"**{lk.naam}** ({lk.functie}, {lk.regime}) – {lk.totaal_punten}/{lk.max_punten} punten")
         st.markdown(f"Toezichten: {lk.toegewezen_toezichten}")
