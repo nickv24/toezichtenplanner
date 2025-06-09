@@ -181,8 +181,8 @@ if st.button("🚀 Genereer planning"):
         rij = {"Tijd": tijd}
         for dag in DAGEN:
             items = [f"{loc}: {', '.join(toezichtschema[(dag, tijd, loc)])}" for loc in LOCATIES_PER_TIJD.get(tijd, []) if (dag, tijd, loc) in toezichtschema]
-            rij[dag] = "
-".join(items).join(items)
+            rij[dag] = "\n".join(items)
+
         rooster = pd.concat([rooster, pd.DataFrame([rij])], ignore_index=True)
     st.dataframe(rooster)
 
