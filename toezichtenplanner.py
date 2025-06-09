@@ -107,29 +107,7 @@ if st.sidebar.button("➕ Opslaan"):
     save_leerkrachten(st.session_state.leerkrachten)
     st.sidebar.success(f"{naam} toegevoegd.")
     st.rerun()
-
-# --- Feedback nieuwe leerkracht ---
-if "nieuwe_leerkracht_toegevoegd" in st.session_state:
-    st.success(f"✅ Leerkracht '{st.session_state.nieuwe_leerkracht_toegevoegd}' succesvol toegevoegd!")
-    del st.session_state.nieuwe_leerkracht_toegevoegd
-
-# --- Planner ---
-if st.button("🚀 Genereer planning"):
-    toezichtschema = defaultdict(list)
-    conflicten = []
-
-    alle_toezichten = []
-    for dag in DAGEN:
-        for tijd in TIJDSLOTS:
-            if dag == "woensdag" and tijd in ["11:25", "11:55", "12:25", "14:45"]:
-                continue
-            locaties = LOCATIES_PER_TIJD.get(tijd, [])
-            for locatie in locaties:
-                if (tijd, locatie) in AANTAL_PER_LOCATIE:
-                    aantal = AANTAL_PER_LOCATIE[(tijd, locatie)]
-                elif dag == "woensdag" and tijd == "11:35":
-                    aantal = 2
-                else:
+else:
     lk = next(l for l in st.session_state.leerkrachten if l.naam == selected)
     naam = st.sidebar.text_input("Naam", value=lk.naam)
     regime = st.sidebar.selectbox("Regime", ["voltijds", "4/5", "halftijds"], index=["voltijds", "4/5", "halftijds"].index(lk.regime))
@@ -159,26 +137,29 @@ if st.button("🚀 Genereer planning"):
         st.sidebar.success(f"Leerkracht {selected} verwijderd.")
         st.rerun()
 
-    if st.sidebar.button("🗑️ Verwijder leerkracht"):
-        st.session_state.leerkrachten = [l for l in st.session_state.leerkrachten if l.naam != selected]
-        save_leerkrachten(st.session_state.leerkrachten)
-        st.sidebar.success(f"Leerkracht {selected} verwijderd.")
-        st.rerun()
-                    aantal = 1
-                alle_toezichten.extend([(dag, tijd, locatie, DUUR_PER_TIJD[tijd])] * aantal)
+# --- Feedback nieuwe leerkracht ---
+if "nieuwe_leerkracht_toegevoegd" in st.session_state:
+    st.success(f"✅ Leerkracht '{st.session_state.nieuwe_leerkracht_toegevoegd}' succesvol toegevoegd!")
+    del st.session_state.nieuwe_leerkracht_toegevoegd
 
-    totaal_waarde = sum(tz[3] for tz in alle_toezichten) + 30 * sum(1 for lk in st.session_state.leerkrachten if lk.warme_maaltijd)
-    kleuter_lk = [lk for lk in st.session_state.leerkrachten if lk.functie in ["kleuter", "alles"]]
-    lager_lk = [lk for lk in st.session_state.leerkrachten if lk.functie == "lager"]
+# --- Planner ---
+if st.button("🚀 Genereer planning"):
+    toezichtschema = defaultdict(list)
+    conflicten = []
 
-    for lk in st.session_state.leerkrachten:
-        if lk.functie in ["kleuter", "alles"]:
-            lk.max_punten = round(totaal_waarde * 0.57 / len(kleuter_lk))
-        else:
-            lk.max_punten = round(totaal_waarde * 0.43 / len(lager_lk))
-        lk.toegewezen_toezichten.clear()
-        lk.totaal_punten = 0
-
+    alle_toezichten = []
+    for dag in DAGEN:
+        for tijd in TIJDSLOTS:
+            if dag == "woensdag" and tijd in ["11:25", "11:55", "12:25", "14:45"]:
+                continue
+            locaties = LOCATIES_PER_TIJD.get(tijd, [])
+            for locatie in locaties:
+                if (tijd, locatie) in AANTAL_PER_LOCATIE:
+                    aantal = AANTAL_PER_LOCATIE[(tijd, locatie)]
+                elif dag == "woensdag" and tijd == "11:35":
+                    aantal = 2
+                else:
+    
     for dag, tijd, locatie, duur in alle_toezichten:
         kandidaten = [lk for lk in st.session_state.leerkrachten if lk.is_beschikbaar(dag, tijd) and lk.heeft_nog_capaciteit(duur)]
         kandidaten.sort(key=lambda x: -x.voorkeur_score(locatie))
